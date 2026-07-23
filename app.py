@@ -33,7 +33,7 @@ Setiap kali user memberitahumu bahwa mereka ingin membuka aplikasi hiburan (misa
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # Form Input User
         st.write("---")
