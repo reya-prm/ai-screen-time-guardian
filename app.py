@@ -2,7 +2,7 @@
 # Project: AI Screen-Time Guardian
 # Stack: Python, Streamlit & Google Gemini API
 # Developer: reya-prm
-# Version: 1.1 (Updated)
+# Version: 1.2 (Optimized)
 # ====================================================
 
 import streamlit as st
@@ -16,7 +16,10 @@ st.caption("Aplikasi AI Pembasmi Doomscrolling & Penjaga Produktivitas")
 
 # Sidebar untuk Input API Key
 st.sidebar.header("⚙️ Pengaturan")
-api_key = st.sidebar.text_input("Masukkan Gemini API Key Kamu:", type="password")
+
+# Ambil API Key dari Streamlit Secrets jika ada, atau dari input Sidebar
+secrets_key = st.secrets.get("GEMINI_API_KEY", "")
+api_key = secrets_key or st.sidebar.text_input("Masukkan Gemini API Key Kamu:", type="password")
 
 # System Instruction untuk AI Guardian
 SYSTEM_PROMPT = """
@@ -33,7 +36,19 @@ Setiap kali user memberitahumu bahwa mereka ingin membuka aplikasi hiburan (misa
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Inisialisasi Model dengan System Instruction
+        # Menggunakan fallback jika salah satu model mengalami limit
+        try:
+            model = genai.GenerativeModel(
+                model_name='gemini-1.5-flash',
+                system_instruction=SYSTEM_PROMPT
+            )
+        except Exception:
+            model = genai.GenerativeModel(
+                model_name='gemini-2.0-flash',
+                system_instruction=SYSTEM_PROMPT
+            )
 
         # Form Input User
         st.write("---")
@@ -45,8 +60,8 @@ if api_key:
         if st.button("Minta Izin Guardian 🛡️", type="primary"):
             if user_input:
                 with st.spinner("AI Guardian sedang menganalisis godaanmu..."):
-                    prompt = f"{SYSTEM_PROMPT}\n\nUser Input: {user_input}"
-                    response = model.generate_content(prompt)
+                    # Memanggil model Gemini
+                    response = model.generate_content(user_input)
                     
                     st.success("Analisis Guardian Selesai!")
                     st.markdown(response.text)
@@ -54,7 +69,7 @@ if api_key:
                 st.warning("Tuliskan dulu godaan aplikasi apa yang mau kamu buka!")
 
     except Exception as e:
-        st.error(f"Terjadi kesalahan pada API Key: {e}")
+        st.error(f"Terjadi kesalahan pada API Key atau Layanan Gemini: {e}")
 else:
     st.info("👈 Masukkan **Gemini API Key** kamu di menu Sidebar sebelah kiri untuk mengaktifkan AI Guardian!")
 
