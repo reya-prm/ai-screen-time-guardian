@@ -2,7 +2,7 @@
 # Project: AI Screen-Time Guardian
 # Stack: Python, Streamlit & Google Gemini API
 # Developer: reya-prm
-# Version: 1.3 (Fixed Model Routing & Fallback)
+# Version: 1.4 (Auto Model Detection & Smart Fallback)
 # ====================================================
 
 import streamlit as st
@@ -17,7 +17,6 @@ st.caption("Aplikasi AI Pembasmi Doomscrolling & Penjaga Produktivitas")
 # Sidebar untuk Input API Key
 st.sidebar.header("⚙️ Pengaturan")
 
-# Ambil API Key dari Streamlit Secrets jika ada, atau dari input Sidebar
 secrets_key = st.secrets.get("GEMINI_API_KEY", "")
 api_key = secrets_key or st.sidebar.text_input("Masukkan Gemini API Key Kamu:", type="password")
 
@@ -32,12 +31,10 @@ Setiap kali user memberitahumu bahwa mereka ingin membuka aplikasi hiburan (misa
 3. 🏃‍♂️ **Rekomendasi Micro-Task:** Berikan 1 ide kegiatan fisik/produktif singkat selama 3 menit sebagai alternatif instan.
 """
 
-# Cek API Key
 if api_key:
     try:
         genai.configure(api_key=api_key)
 
-        # Form Input User
         st.write("---")
         user_input = st.text_input(
             "Apa yang ingin kamu buka/lakukan sekarang?", 
@@ -47,23 +44,38 @@ if api_key:
         if st.button("Minta Izin Guardian 🛡️", type="primary"):
             if user_input:
                 with st.spinner("AI Guardian sedang menganalisis godaanmu..."):
-                    # Coba panggil model gemini-2.0-flash yang aktif dan stabil
-                    try:
-                        model = genai.GenerativeModel(
-                            model_name='gemini-2.0-flash',
-                            system_instruction=SYSTEM_PROMPT
-                        )
-                        response = model.generate_content(user_input)
-                    except Exception:
-                        # Fallback ke gemini-2.0-flash-lite jika ada kendala
-                        model = genai.GenerativeModel(
-                            model_name='gemini-2.0-flash-lite',
-                            system_instruction=SYSTEM_PROMPT
-                        )
-                        response = model.generate_content(user_input)
+                    # 1. Cari semua model yang didukung oleh API Key ini secara otomatis
+                    all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    
+                    # 2. Urutan prioritas model yang akan dicoba
+                    priority_models = [
+                        'models/gemini-2.0-flash',
+                        'models/gemini-1.5-flash',
+                        'models/gemini-2.0-flash-lite',
+                        'models/gemini-1.5-pro'
+                    ]
+                    
+                    target_model = None
+                    for p_model in priority_models:
+                        if p_model in all_models:
+                            target_model = p_model
+                            break
+                    
+                    # Jika tidak ada di daftar prioritas, pakai model pertama yang tersedia
+                    if not target_model and all_models:
+                        target_model = all_models[0]
 
-                    st.success("Analisis Guardian Selesai!")
-                    st.markdown(response.text)
+                    if target_model:
+                        model = genai.GenerativeModel(
+                            model_name=target_model,
+                            system_instruction=SYSTEM_PROMPT
+                        )
+                        response = model.generate_content(user_input)
+                        
+                        st.success(f"Analisis Guardian Selesai!")
+                        st.markdown(response.text)
+                    else:
+                        st.error("Tidak ada model Gemini yang aktif untuk API Key ini. Silakan buat API Key baru di project baru.")
             else:
                 st.warning("Tuliskan dulu godaan aplikasi apa yang mau kamu buka!")
 
@@ -72,6 +84,5 @@ if api_key:
 else:
     st.info("👈 Masukkan **Gemini API Key** kamu di menu Sidebar sebelah kiri untuk mengaktifkan AI Guardian!")
 
-# Footer Tambahan
 st.write("---")
 st.caption("🚀 Built with Python & Streamlit | Powered by Google Gemini API")
