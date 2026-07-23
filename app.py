@@ -2,7 +2,7 @@
 # Project: AI Screen-Time Guardian
 # Stack: Python, Streamlit & Google Gemini API
 # Developer: reya-prm
-# Version: 1.2 (Optimized)
+# Version: 1.3 (Fixed Model Routing & Fallback)
 # ====================================================
 
 import streamlit as st
@@ -37,19 +37,6 @@ if api_key:
     try:
         genai.configure(api_key=api_key)
 
-        # Inisialisasi Model dengan System Instruction
-        # Menggunakan fallback jika salah satu model mengalami limit
-        try:
-            model = genai.GenerativeModel(
-                model_name='gemini-1.5-flash',
-                system_instruction=SYSTEM_PROMPT
-            )
-        except Exception:
-            model = genai.GenerativeModel(
-                model_name='gemini-2.0-flash',
-                system_instruction=SYSTEM_PROMPT
-            )
-
         # Form Input User
         st.write("---")
         user_input = st.text_input(
@@ -60,9 +47,21 @@ if api_key:
         if st.button("Minta Izin Guardian 🛡️", type="primary"):
             if user_input:
                 with st.spinner("AI Guardian sedang menganalisis godaanmu..."):
-                    # Memanggil model Gemini
-                    response = model.generate_content(user_input)
-                    
+                    # Coba panggil model gemini-2.0-flash yang aktif dan stabil
+                    try:
+                        model = genai.GenerativeModel(
+                            model_name='gemini-2.0-flash',
+                            system_instruction=SYSTEM_PROMPT
+                        )
+                        response = model.generate_content(user_input)
+                    except Exception:
+                        # Fallback ke gemini-2.0-flash-lite jika ada kendala
+                        model = genai.GenerativeModel(
+                            model_name='gemini-2.0-flash-lite',
+                            system_instruction=SYSTEM_PROMPT
+                        )
+                        response = model.generate_content(user_input)
+
                     st.success("Analisis Guardian Selesai!")
                     st.markdown(response.text)
             else:
